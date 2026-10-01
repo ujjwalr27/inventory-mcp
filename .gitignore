@@ -1,0 +1,18 @@
+# Secrets and tokens - never commit
+.env
+.tokens/
+*.token.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
