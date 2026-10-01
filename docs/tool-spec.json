@@ -1,0 +1,529 @@
+{
+  "server": "zoho-inventory",
+  "instructions": "Read-only access to one merchant's Zoho Inventory: products and stock levels, sales orders with their fulfillment/shipping progress, and customer contact details.\n\nYou can look things up; you cannot create, edit, cancel or delete anything, and you cannot see invoices, payments, refunds or purchase orders. If the user asks for a change, say it must be done in Zoho Inventory directly.\n\nTips: search first, then call get_* with the returned ID for full details. Results are cached for up to a minute; pass fresh=true only when the user explicitly asks for the latest data. Each tool result may include `warnings` (for example a nearly exhausted daily API quota) that you should pass on to the user. If a tool returns an error with retryable=false, do not retry it.",
+  "tools": [
+    {
+      "name": "search_items",
+      "description": "Find products by name or SKU and see their price and stock.\n\nUse for \"do we have X?\", \"how many X are left?\", \"what does X cost?\". With no query,\nlists products. For a single product's committed stock, follow up with get_item.\n",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words from the product name or SKU, e.g. 'blue kurta' or 'DEMO-TEA'.",
+            "title": "Query"
+          },
+          "sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact SKU, when the user gives one.",
+            "title": "Sku"
+          },
+          "status": {
+            "default": "active",
+            "description": "Product status filter.",
+            "enum": [
+              "active",
+              "inactive",
+              "all"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "limit": {
+            "default": 10,
+            "description": "Maximum results to return (1-50).",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pass next_cursor from a previous result to get the next page.",
+            "title": "Cursor"
+          },
+          "fresh": {
+            "default": false,
+            "description": "Bypass the short-lived cache. Use only when the user asks for live data.",
+            "title": "Fresh",
+            "type": "boolean"
+          }
+        },
+        "title": "search_itemsArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "search_itemsDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_item",
+      "description": "Full stock picture for one product: on hand, committed to orders, available for sale, reorder level.",
+      "inputSchema": {
+        "properties": {
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "item_id from search_items.",
+            "title": "Item Id"
+          },
+          "sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact SKU, if the item_id is not known.",
+            "title": "Sku"
+          },
+          "fresh": {
+            "default": false,
+            "description": "Bypass the short-lived cache. Use only when the user asks for live data.",
+            "title": "Fresh",
+            "type": "boolean"
+          }
+        },
+        "title": "get_itemArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "get_itemDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "list_low_stock_items",
+      "description": "Products at or below their reorder level, i.e. what the merchant should restock.\n\nUses Zoho's own low-stock view. Items with no reorder level set never appear here.\n",
+      "inputSchema": {
+        "properties": {
+          "limit": {
+            "default": 20,
+            "description": "Maximum results to return (1-50).",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pass next_cursor from a previous result to get the next page.",
+            "title": "Cursor"
+          },
+          "fresh": {
+            "default": false,
+            "description": "Bypass the short-lived cache. Use only when the user asks for live data.",
+            "title": "Fresh",
+            "type": "boolean"
+          }
+        },
+        "title": "list_low_stock_itemsArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "list_low_stock_itemsDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "search_sales_orders",
+      "description": "Find sales orders by number, customer, status or date range (newest first).\n\nEach result has fulfillment_stage: draft, confirmed, packed, shipped, etc. Use\nget_sales_order for line items and tracking numbers.\n",
+      "inputSchema": {
+        "properties": {
+          "order_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Zoho order number (SO-00001) or the merchant's reference number.",
+            "title": "Order Number"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Customer's name as stored in Zoho.",
+            "title": "Customer Name"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "contact_id from search_contacts.",
+            "title": "Customer Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "draft",
+                  "confirmed",
+                  "shipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "'confirmed' also includes packed and shipped orders; check fulfillment_stage.",
+            "title": "Status"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order date on or after, YYYY-MM-DD.",
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order date on or before, YYYY-MM-DD.",
+            "title": "Date To"
+          },
+          "limit": {
+            "default": 10,
+            "description": "Maximum results to return (1-50).",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pass next_cursor from a previous result to get the next page.",
+            "title": "Cursor"
+          },
+          "fresh": {
+            "default": false,
+            "description": "Bypass the short-lived cache. Use only when the user asks for live data.",
+            "title": "Fresh",
+            "type": "boolean"
+          }
+        },
+        "title": "search_sales_ordersArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "search_sales_ordersDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_sales_order",
+      "description": "One order in full: what was bought, how much is packed/shipped, carrier and tracking number.\n\nUse for \"what did they order?\", \"has it shipped?\", \"where is my order?\".\n",
+      "inputSchema": {
+        "properties": {
+          "salesorder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "salesorder_id from search_sales_orders.",
+            "title": "Salesorder Id"
+          },
+          "order_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SO number or reference, if the ID is not known.",
+            "title": "Order Number"
+          },
+          "fresh": {
+            "default": false,
+            "description": "Bypass the short-lived cache. Use only when the user asks for live data.",
+            "title": "Fresh",
+            "type": "boolean"
+          }
+        },
+        "title": "get_sales_orderArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "get_sales_orderDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "search_contacts",
+      "description": "Find a customer by name, email or phone to identify who is asking or get their contact_id.",
+      "inputSchema": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Part of the customer's name.",
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Part of the email address.",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Phone number, any format; at least 5 digits.",
+            "title": "Phone"
+          },
+          "contact_type": {
+            "default": "customers",
+            "description": "Which contacts to search.",
+            "enum": [
+              "customers",
+              "vendors",
+              "all"
+            ],
+            "title": "Contact Type",
+            "type": "string"
+          },
+          "limit": {
+            "default": 10,
+            "description": "Maximum results to return (1-50).",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pass next_cursor from a previous result to get the next page.",
+            "title": "Cursor"
+          },
+          "fresh": {
+            "default": false,
+            "description": "Bypass the short-lived cache. Use only when the user asks for live data.",
+            "title": "Fresh",
+            "type": "boolean"
+          }
+        },
+        "title": "search_contactsArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "search_contactsDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_contact",
+      "description": "One customer's details: name, company, email, phone and city/state. No payment information.",
+      "inputSchema": {
+        "properties": {
+          "contact_id": {
+            "description": "contact_id from search_contacts.",
+            "title": "Contact Id",
+            "type": "string"
+          },
+          "fresh": {
+            "default": false,
+            "description": "Bypass the short-lived cache. Use only when the user asks for live data.",
+            "title": "Fresh",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "contact_id"
+        ],
+        "title": "get_contactArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "get_contactDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_connector_status",
+      "description": "Which Zoho organization is connected, and how much of today's API quota is left.\n\nCall this if tools are failing or the user asks whether the inventory connection works.\nIt does not call Zoho, so it is free.\n",
+      "inputSchema": {
+        "properties": {},
+        "title": "get_connector_statusArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "get_connector_statusDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    }
+  ]
+}
